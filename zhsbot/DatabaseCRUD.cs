@@ -5,7 +5,7 @@ using zhsbot.Helper;
 
 namespace zhsbot;
 
-public class DatabaseCURD : IDisposable
+public class DatabaseCRUD : IDisposable
 {
   private readonly string _ownnerMark;
   private MySqlConnection? _mySqlConnection;
@@ -16,7 +16,7 @@ public class DatabaseCURD : IDisposable
   private readonly string _password;
   private readonly string _database;
 
-  public DatabaseCURD(Settings settings, string ownner_mark)
+  public DatabaseCRUD(Settings settings, string ownner_mark)
   {
     _host = settings.Database_Host;
     _user = settings.Database_User;
@@ -133,6 +133,28 @@ public class DatabaseCURD : IDisposable
     return userBean;
   }
 
+  public MsgBean GetMsg(long msg_id)
+  {
+    MsgBean msg = new();
+    string sql_user = $"select * from msg where msg_id=@mid";
+    using MySqlCommand command1 = new MySqlCommand(sql_user, _mySqlConnection);
+    command1.Parameters.AddWithValue("@mid", msg_id);
+    using var mySqlDataReader = command1.ExecuteReader();
+    if (mySqlDataReader.Read())
+    {
+      msg.content = (string)mySqlDataReader["content"];
+      msg.msg_id = (int)mySqlDataReader["msg_id"];
+      msg.channel_id = (long)mySqlDataReader["channel_id"];
+      msg.user_id = (long)mySqlDataReader["user_id"];
+      msg.send_time = (DateTime)mySqlDataReader["send_time"];
+    }
+    else
+    {
+      throw new ApplicationException($"imposeable exception , it can not be HAPPEN! {msg_id}");
+    }
+    return msg;
+  }
+
   public int GetMsgIDMinOrMax(long channel_id, bool max = false)
   {
     int res = 0;
@@ -232,11 +254,64 @@ public class DatabaseCURD : IDisposable
     }
   }
 
-  public List<(MsgBean, UserBean)>? FulltextSearch(string s)
+  public List<(MsgBean, UserBean)>? FulltextSearch(string s, out long res_count, long channel_id = -1, long user_id = -1)
   {
-    string sql_search = $"select a.content, a.msg_id, a.channel_id, u.first_name, u.last_name from (select * from msg where match(content) against(@s in boolean mode)) as a inner join user u on a.user_id = u.user_id order by a.msg_id desc limit 10";
+    long search_count = 0;
+    string count_1 = $"select count(msg_id) from msg where ";
+    string count_2 = $" match(content) against(@s in boolean mode)";
+    string search_1 = $"select a.content, a.msg_id, a.channel_id, u.first_name, u.last_name from (select * from msg where ";
+    string search_2 = $" match(content) against(@s in boolean mode)) as a inner join user u on a.user_id = u.user_id order by a.msg_id desc limit 10";
+    string middle_str = "";
+
+    if (channel_id != -1)
+    {
+      middle_str += "channel_id=@cid and ";
+    }
+
+    if (user_id != -1)
+    {
+      middle_str += "user_id=@uid and ";
+    }
+
+    string sql_search = $"{search_1}{middle_str}{search_2}";
+    string sql_count = $"{count_1}{middle_str}{count_2}";
+
+    using (var count_cmd = new MySqlCommand(sql_count, GetSqlConnection()))
+    {
+      count_cmd.Parameters.AddWithValue("@s", s);
+      if (channel_id != -1)
+      {
+        count_cmd.Parameters.AddWithValue("@cid", channel_id);
+      }
+
+      if (user_id != -1)
+      {
+        count_cmd.Parameters.AddWithValue("@uid", user_id);
+      }
+      using (var count_read = count_cmd.ExecuteReader())
+      {
+        count_read.Read();
+        search_count = (long)count_read["count(msg_id)"];
+        res_count = search_count;
+      }
+      if (search_count == 0)
+      {
+        Console.WriteLine("没有搜索结果");
+        return null;
+      }
+    }
+
     using MySqlCommand command = new MySqlCommand(sql_search, GetSqlConnection());
     command.Parameters.AddWithValue("@s", s);
+    if (channel_id != -1)
+    {
+      command.Parameters.AddWithValue("@cid", channel_id);
+    }
+
+    if (user_id != -1)
+    {
+      command.Parameters.AddWithValue("@uid", user_id);
+    }
     using var reader = command.ExecuteReader();
     List<(MsgBean, UserBean)> beans = new();
     while (reader.Read())
@@ -251,12 +326,6 @@ public class DatabaseCURD : IDisposable
         first_name = (string)reader["first_name"],
         last_name = (string)reader["last_name"]
       }));
-    }
-
-    if (beans.Count == 0)
-    {
-      Console.WriteLine("没有搜索结果");
-      return null;
     }
     return beans;
   }

@@ -14,7 +14,7 @@ public class Program
 
     Task.Run(async () =>
     {
-      using DatabaseCURD curd = new DatabaseCURD(Wraper.MainSettings,"fill_history_or_Gap");
+      using DatabaseCRUD crud = new DatabaseCRUD(Wraper.MainSettings,"fill_history_or_Gap");
       Helpers.WriteLine("Fill history loop started !", ConsoleColor.Yellow);
       foreach (var id in Wraper.MainSettings.Channel_IDs)
       {
@@ -26,9 +26,9 @@ public class Program
             Console.WriteLine($"you not a member of channel --> {id}");
             continue;
           }
-          if (!curd.IsHistoryFilled(peer))
+          if (!crud.IsHistoryFilled(peer))
           {
-            await curd.StartFillHistoryLoop(peer);
+            await crud.StartFillHistoryLoop(peer);
           }
           else
           {
@@ -36,13 +36,13 @@ public class Program
           }
           Helpers.WriteLine($"Now we check is there a gap in msgs. channel_id --> {id}", ConsoleColor.Green);
           int topMsgId = Wraper.GetInstance().GetTopMsgIdOfAnChannel(peer.ID);
-          int maxMsgIdInDatabase = curd.GetMsgIDMinOrMax(peer.ID, true);
+          int maxMsgIdInDatabase = crud.GetMsgIDMinOrMax(peer.ID, true);
           if (maxMsgIdInDatabase == topMsgId)
           {
             Helpers.WriteLine($"DataBase is newest, unnesscery to Fill Gap. channel_id --> {id}", ConsoleColor.Green);
             continue;
           }
-          await curd.StartFillHistoryLoop(peer, maxMsgIdInDatabase);
+          await crud.StartFillHistoryLoop(peer, maxMsgIdInDatabase);
 
           Helpers.WriteLine("All messge fill task processed !");
         }

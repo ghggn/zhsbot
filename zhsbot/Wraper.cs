@@ -17,7 +17,7 @@ public class Wraper
   public ManualResetEvent _manualResetEvent = new ManualResetEvent(false);
   public Messages_Dialogs Dialogs;
 
-  public readonly DatabaseCURD Curd;
+  public readonly DatabaseCRUD Crud;
   private readonly string _settingsFileName = "setting.json";
   public readonly Dictionary<long, User> Users = new();
   public readonly Dictionary<long, ChatBase> Chats = new();
@@ -25,7 +25,7 @@ public class Wraper
   private Wraper()
   {
     ReadSettings();
-    Curd = new DatabaseCURD(MainSettings, "wraper_for_handle_update");
+    Crud = new DatabaseCRUD(MainSettings, "wraper_for_handle_update");
 #if !DEBUG
     WTelegram.Helpers.Log = (i, s) =>
     {
@@ -227,7 +227,7 @@ public class Wraper
       postUsers.Add(user.Value.id, user.Value);
     }
 
-    Curd.CollectPeerEntity(postUsers, postChats);
+    Crud.CollectPeerEntity(postUsers, postChats);
   }
 
   private async ValueTask GetAllDialogs()
